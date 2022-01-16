@@ -18,8 +18,12 @@ from torchvision.transforms import ToPILImage
 #
 ##########
 
-def _shuffle(x, y):
-    rng_state = np.random.get_state()
+def _shuffle(x, y, rng_state=None):
+    if rng_state is None:
+        rng_state = np.random.get_state()
+    else:
+        np.random.seed(rng_state)
+        rng_state = np.random.get_state()
     np.random.shuffle(x.numpy())
     np.random.set_state(rng_state)
     np.random.shuffle(y.numpy())
@@ -27,21 +31,21 @@ def _shuffle(x, y):
     return x, y
 
 
-def _train_val_MNIST():
+def _train_val_MNIST(rng_state):
     mnist = torchvision.datasets.MNIST(DATA_DIR, train=True, download=True)
 
     mnist_train = (mnist.data[:50000], mnist.targets[:50000])
     mnist_val = (mnist.data[50000:], mnist.targets[50000:])
 
-    mnist_train = _shuffle(*mnist_train)
+    mnist_train = _shuffle(*mnist_train, rng_state)
 
     return mnist_train, mnist_val
 
 
-def load_control_experimental_MNIST(spurious_value=0.1):
+def load_control_experimental_MNIST(spurious_value=0.1, rng_state=None):
     mnist = torchvision.datasets.MNIST(DATA_DIR, train=True, download=True)
 
-    mnist_x, mnist_y = _shuffle(mnist.data, mnist.targets)
+    mnist_x, mnist_y = _shuffle(mnist.data, mnist.targets, rng_state)
 
     # binarize
     mnist_y = (mnist_y < 5).float()
@@ -66,12 +70,14 @@ def load_control_experimental_MNIST(spurious_value=0.1):
     return control_data, experimental_data
 
 
-def load_test_MNIST(spurious_value=0.1):
+def load_test_MNIST(spurious_correlation=0, spurious_value=0.1):
     mnist_test = torchvision.datasets.MNIST(DATA_DIR, train=False, download=True)
     mnist_test_x, mnist_test_y = mnist_test.data, mnist_test.targets
     mnist_test_y = (mnist_test_y < 5).float()
 
-    mnist_test_x, mnist_test_y = append_spurious_channel(mnist_test_x, mnist_test_y, sp_corr=0.5, sp_val=spurious_value)
+    mnist_test_x, mnist_test_y = append_spurious_channel(mnist_test_x, mnist_test_y,
+                                                         sp_corr=spurious_correlation,
+                                                         sp_val=spurious_value)
 
     test_data = {
         'images': mnist_test_x,
@@ -90,7 +96,7 @@ def append_spurious_channel(images, labels, sp_corr, sp_val):
 
     # Assign a color based on the label; flip the color with probability e
     colors = torch_xor(labels, torch_bernoulli(1 - sp_corr, len(labels)))
-    images = torch.stack([images, images], dim=1)
+    images = torch.stack([images, images], dim=1).int()
     # display(ToPILImage()(images[0]).convert('RGB'))
     # set the second channel to colors
     images[torch.tensor(range(len(images))), 1, :, :] *= 0
@@ -100,8 +106,8 @@ def append_spurious_channel(images, labels, sp_corr, sp_val):
     return (images.float() / 255.), labels
 
 
-def load_binary_MNIST(spurious_correlation=None):
-    mnist_train, mnist_val = _train_val_MNIST()
+def load_binary_MNIST(spurious_correlation=None, rng_state=None):
+    mnist_train, mnist_val = _train_val_MNIST(rng_state)
 
     if spurious_correlation is not None:
         mnist_train = make_environment(mnist_train[0], mnist_train[1], 1 - spurious_correlation)
