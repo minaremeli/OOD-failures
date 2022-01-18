@@ -66,8 +66,6 @@ def evaluate_max_margin(x_test, y_test, weights, bias):
     x_test = x_test.reshape((x_test.shape[0], -1))
     y_test = y_test.reshape((y_test.shape[0]))
     margins = np.matmul(x_test, weights) + bias
-    print(margins.shape)
-    print(y_test.shape)
     accuracy = torch.mean((torch.multiply(margins, 2 * y_test - 1) > 0.0).float())
     return accuracy
 
